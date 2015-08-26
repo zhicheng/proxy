@@ -20,10 +20,9 @@ class ProxyConnection(object):
 
 	def __init__(self, client, address):
 		self.address = address
+		self.resolver = tornado.netutil.Resolver()
 
 		self.handshake(client)
-
-		self.resolver = tornado.netutil.Resolver()
 
 	def client_recv(self, data, finished=False):
 
@@ -143,6 +142,7 @@ class ProxyConnection(object):
 					addr = yield self.resolver.resolve(host, port)
 					addr = addr[0][1][0]
 				except Exception as e:
+					logging.error(e)
 					addr = ''
 			else:
 				addr = ''
