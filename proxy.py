@@ -10,6 +10,7 @@ import tornado.iostream
 import tornado.tcpclient
 import tornado.tcpserver
 import tornado.autoreload
+import concurrent.futures
 
 import geoip2.database
 geoip = geoip2.database.Reader('GeoLite2-Country.mmdb')
@@ -20,6 +21,8 @@ class ProxyConnection(object):
 		self.address = address
 
 		self.handshake(client)
+
+		self.resolver = tornado.netutil.Resolver()
 
 	def client_recv(self, data, finished=False):
 
@@ -118,13 +121,11 @@ class ProxyConnection(object):
 			port = struct.unpack('!H', data)[0]
 
 			if host not in tornado.options.options.hostname_rules:
-				resolver = tornado.netutil.Resolver()
 				try:
-					addr = yield resolver.resolve(host, port)
+					addr = yield self.resolver.resolve(host, port)
 					addr = addr[0][1][0]
 				except Exception as e:
 					addr = ''
-				resolver.close()
 			else:
 				addr = ''
 		elif atyp == 0x04:
@@ -154,8 +155,6 @@ class ProxyServer(tornado.tcpserver.TCPServer):
 		self.connection[address] = ProxyConnection(stream, address)
 
 def main():
-	tornado.netutil.Resolver.configure('tornado.netutil.ThreadedResolver')
-
 	tornado.options.define("port",    default=8888)
 	tornado.options.define("workers", default=1)
 	tornado.options.define("default", default={'mode': 'pass'})
@@ -174,8 +173,12 @@ def main():
 	server.bind(tornado.options.options.port)
 	server.start(tornado.options.options.workers)
 
+	executor = concurrent.futures.ThreadPoolExecutor(20)
+	tornado.netutil.Resolver.configure('tornado.netutil.ExecutorResolver', executor=executor)
+
 	tornado.autoreload.watch(tornado.options.options.config)
 	tornado.autoreload.start()
+
 	tornado.ioloop.IOLoop.current().start()
 
 if __name__ == '__main__':
