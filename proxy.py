@@ -1,3 +1,4 @@
+import ssl
 import struct
 import socket
 import logging
@@ -83,6 +84,23 @@ class ProxyConnection(object):
 			stream.write(request)
 			data = yield stream.read_bytes(4096, partial=True)
 			client.write(data)
+		elif rule.get('mode', 'pass').lower() == 'socks5s':
+			logging.info('proxy %s to %s %s via %s' % \
+				(self.address, hostname, (addr, port), (rule.get('host'), rule.get('port'))))
+
+			stream = yield tornado.tcpclient.TCPClient().connect(
+					rule.get('host'),
+					rule.get('port'),
+					ssl_options=dict(cert_reqs=ssl.CERT_NONE))
+			yield stream.wait_for_handshake()
+			stream.write(struct.pack('BBB', 0x05, 0x01, 0x00))
+			data = yield stream.read_bytes(2)
+			if data != struct.pack('BB', 0x05, 0x00):
+				raise Exception()
+
+			stream.write(request)
+			data = yield stream.read_bytes(4096, partial=True)
+			client.write(data)
 		else:
 			raise Exception()
 
@@ -155,9 +173,15 @@ class ProxyServer(tornado.tcpserver.TCPServer):
 		self.connection[address] = ProxyConnection(stream, address)
 
 def main():
-	tornado.options.define("port",    default=8888)
 	tornado.options.define("workers", default=1)
 	tornado.options.define("default", default={'mode': 'pass'})
+
+	tornado.options.define("tcp_port",    default=8888)
+
+	tornado.options.define("ssl",         default=False)
+	tornado.options.define("ssl_port",    default=8443)
+	tornado.options.define("ssl_key",     default="server.key")
+	tornado.options.define("ssl_crt",     default="server.crt")
 
 	tornado.options.define("country_rules",  default={})
 	tornado.options.define("hostname_rules", default={})
@@ -167,11 +191,25 @@ def main():
         tornado.options.parse_command_line()
         tornado.options.parse_config_file(tornado.options.options.config)
 
-	server = ProxyServer()
+	tcp_sockets = tornado.netutil.bind_sockets(tornado.options.options.tcp_port)
+	if tornado.options.options.ssl:
+		ssl_sockets = tornado.netutil.bind_sockets(tornado.options.options.ssl_port)
+	tornado.process.fork_processes(tornado.options.options.workers)
 
-	server.connection = {}
-	server.bind(tornado.options.options.port)
-	server.start(tornado.options.options.workers)
+	tcp_server = ProxyServer()
+	tcp_server.connection = {}
+	tcp_server.add_sockets(tcp_sockets)
+
+	if tornado.options.options.ssl:
+		ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+		ssl_ctx.load_cert_chain(
+			tornado.options.options.ssl_crt,
+			tornado.options.options.ssl_key
+		)
+		ssl_server = ProxyServer(ssl_options=ssl_ctx)
+		ssl_server.connection = {}
+		ssl_server.add_sockets(ssl_sockets)
+
 
 	executor = concurrent.futures.ThreadPoolExecutor(20)
 	tornado.netutil.Resolver.configure('tornado.netutil.ExecutorResolver', executor=executor)
