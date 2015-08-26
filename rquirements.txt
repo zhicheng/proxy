@@ -1,0 +1,9 @@
+backports.ssl-match-hostname==3.4.0.2
+certifi==2015.4.28
+futures==3.0.3
+geoip2==2.2.0
+ipaddr==2.1.11
+maxminddb==1.2.0
+requests==2.7.0
+tornado==4.2.1
+virtualenv==13.1.2
