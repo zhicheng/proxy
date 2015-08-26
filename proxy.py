@@ -201,11 +201,17 @@ def main():
 	tcp_server.add_sockets(tcp_sockets)
 
 	if tornado.options.options.ssl:
+		"""
 		ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
 		ssl_ctx.load_cert_chain(
 			tornado.options.options.ssl_crt,
 			tornado.options.options.ssl_key
 		)
+		"""
+		ssl_ctx = {
+			'keyfile': tornado.options.options.ssl_key,
+			'certfile': tornado.options.options.ssl_crt,
+		}
 		ssl_server = ProxyServer(ssl_options=ssl_ctx)
 		ssl_server.connection = {}
 		ssl_server.add_sockets(ssl_sockets)
