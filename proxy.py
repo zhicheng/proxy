@@ -11,16 +11,15 @@ import tornado.iostream
 import tornado.tcpclient
 import tornado.tcpserver
 import tornado.autoreload
-import concurrent.futures
 
 import geoip2.database
 geoip = geoip2.database.Reader('GeoLite2-Country.mmdb')
 
 class ProxyConnection(object):
 
-	def __init__(self, client, address):
+	def __init__(self, client, address, server):
 		self.address = address
-		self.resolver = tornado.netutil.Resolver()
+		self.resolver = server.resolver
 
 		self.handshake(client)
 
@@ -170,7 +169,7 @@ class ProxyConnection(object):
 class ProxyServer(tornado.tcpserver.TCPServer):
 
 	def handle_stream(self, stream, address):
-		self.connection[address] = ProxyConnection(stream, address)
+		self.connection[address] = ProxyConnection(stream, address, server=self)
 
 def main():
 	tornado.options.define("workers", default=1)
@@ -199,6 +198,7 @@ def main():
 	tcp_server = ProxyServer()
 	tcp_server.connection = {}
 	tcp_server.add_sockets(tcp_sockets)
+	tcp_server.resolver = tornado.netutil.Resolver()
 
 	if tornado.options.options.ssl:
 		"""
@@ -215,10 +215,9 @@ def main():
 		ssl_server = ProxyServer(ssl_options=ssl_ctx)
 		ssl_server.connection = {}
 		ssl_server.add_sockets(ssl_sockets)
+		ssl_server.resolver = tornado.netutil.Resolver()
 
-
-	executor = concurrent.futures.ThreadPoolExecutor(20)
-	tornado.netutil.Resolver.configure('tornado.netutil.ExecutorResolver', executor=executor)
+	tornado.netutil.Resolver.configure('tornado.netutil.ThreadedResolver', num_threads=10)
 
 	tornado.autoreload.watch(tornado.options.options.config)
 	tornado.autoreload.start()
