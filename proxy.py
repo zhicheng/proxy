@@ -63,7 +63,7 @@ class ProxyConnection(object):
 			rule = tornado.options.options.hostname_rules.get(hostname)
 
 		if rule.get('mode', 'pass') == 'pass':
-			logging.info('pass %s to %s %s' % (self.address, hostname, (addr, port)))
+			logging.info('pass  %s to %s %s' % (self.address, hostname, (addr, port)))
 
 			stream = yield tornado.tcpclient.TCPClient().connect(addr, port)
 
