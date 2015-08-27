@@ -136,7 +136,8 @@ class ProxyConnection(object):
 			request += data
 			port = struct.unpack('!H', data)[0]
 
-			if host not in tornado.options.options.hostname_rules:
+			rule = tornado.options.options.hostname_rules.get(host, {})
+			if rule.get('mode', 'pass') == 'pass':
 				try:
 					addr = yield self.resolver.resolve(host, port)
 					addr = addr[0][1][0]
