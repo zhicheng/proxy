@@ -109,6 +109,16 @@ class ProxyConnection(object):
 
 		data = yield client.read_bytes(2)
 		ver, nmethods = struct.unpack('BB', data)
+		if ver != 5:
+			client.write(
+				'''HTTP/1.1 200 OK\r\n'''
+				'''Content-Length: 10\r\n'''
+				'''Server: nginx/2.0\r\n'''
+				'''Content-Type: text/plain\r\n\r\n'''
+				'''HelloWorld'''
+			)
+			client.close()
+			return
 		methods = yield client.read_bytes(nmethods)
 		client.write(struct.pack('BB', 0x05, 0x00))
 
@@ -176,12 +186,12 @@ def main():
 	tornado.options.define("workers", default=1)
 	tornado.options.define("default", default={'mode': 'pass'})
 
-	tornado.options.define("tcp_port",    default=8888)
+	tornado.options.define("socks5_port",    default=8888)
 
-	tornado.options.define("ssl",         default=False)
-	tornado.options.define("ssl_port",    default=8443)
-	tornado.options.define("ssl_key",     default="server.key")
-	tornado.options.define("ssl_crt",     default="server.crt")
+	tornado.options.define("socks5s",      default=False)
+	tornado.options.define("socks5s_port", default=8443)
+	tornado.options.define("socks5s_key",  default="server.key")
+	tornado.options.define("socks5s_crt",  default="server.crt")
 
 	tornado.options.define("country_rules",  default={})
 	tornado.options.define("hostname_rules", default={})
@@ -191,32 +201,25 @@ def main():
         tornado.options.parse_command_line()
         tornado.options.parse_config_file(tornado.options.options.config)
 
-	tcp_sockets = tornado.netutil.bind_sockets(tornado.options.options.tcp_port)
-	if tornado.options.options.ssl:
-		ssl_sockets = tornado.netutil.bind_sockets(tornado.options.options.ssl_port)
+	socks5_sockets = tornado.netutil.bind_sockets(tornado.options.options.socks5_port)
+	if tornado.options.options.socks5s_port:
+		socks5s_sockets = tornado.netutil.bind_sockets(tornado.options.options.socks5s_port)
 	tornado.process.fork_processes(tornado.options.options.workers)
 
-	tcp_server = ProxyServer()
-	tcp_server.connection = {}
-	tcp_server.add_sockets(tcp_sockets)
-	tcp_server.resolver = tornado.netutil.Resolver()
+	socks5_server = ProxyServer()
+	socks5_server.connection = {}
+	socks5_server.add_sockets(socks5_sockets)
+	socks5_server.resolver = tornado.netutil.Resolver()
 
-	if tornado.options.options.ssl:
-		"""
-		ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-		ssl_ctx.load_cert_chain(
-			tornado.options.options.ssl_crt,
-			tornado.options.options.ssl_key
-		)
-		"""
-		ssl_ctx = {
-			'keyfile': tornado.options.options.ssl_key,
-			'certfile': tornado.options.options.ssl_crt,
+	if tornado.options.options.socks5s_port:
+		ssl_options = {
+			'keyfile': tornado.options.options.socks5s_key,
+			'certfile': tornado.options.options.socks5s_crt,
 		}
-		ssl_server = ProxyServer(ssl_options=ssl_ctx)
-		ssl_server.connection = {}
-		ssl_server.add_sockets(ssl_sockets)
-		ssl_server.resolver = tornado.netutil.Resolver()
+		socks5s_server = ProxyServer(ssl_options=ssl_options)
+		socks5s_server.connection = {}
+		socks5s_server.add_sockets(socks5s_sockets)
+		socks5s_server.resolver = tornado.netutil.Resolver()
 
 	tornado.netutil.Resolver.configure('tornado.netutil.ThreadedResolver', num_threads=10)
 

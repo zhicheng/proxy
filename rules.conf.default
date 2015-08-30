@@ -1,11 +1,9 @@
 workers = 8
 
-tcp_port = 8888
-
-ssl      = False
-ssl_port = 8443
-ssl_key  = 'server.key'
-ssl_crt  = 'server.crt'
+socks5_port  = 8888
+socks5s_port = 8443
+socks5s_key  = 'server.key'
+socks5s_crt  = 'server.crt'
 
 default = {'mode': 'socks5s', 'host': '127.0.0.1', 'port': 7443}
 
