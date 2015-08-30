@@ -85,20 +85,23 @@ class ProxyConnection(object):
 			ip   = dstaddr
 		elif atyp == SOCKS5.ATYP_DOMAINNAME:
 			rule = {}
+			matched = False
 			for pat, val in tornado.options.options.hostname_rules.iteritems():
 				if fnmatch.fnmatch(dstaddr, pat):
 					rule = val 
+					matched = True
 					break
 
-			if rule.get('mode', 'pass') == 'pass':
-				rule = tornado.options.options.default
+			if rule.get('mode', 'pass'):
 				try:
 					addr = yield self.resolver.resolve(dstaddr, dstport)
 					ip = addr[0][1][0]
-					cc = geoip.country(ip).country.iso_code
-					if cc:
-						cc = cc.lower()
-					rule = tornado.options.options.country_rules.get(cc, rule)
+					if not matched:
+						rule = tornado.options.options.default
+						cc = geoip.country(ip).country.iso_code
+						if cc:
+							cc = cc.lower()
+						rule = tornado.options.options.country_rules.get(cc, rule)
 				except Exception as e:
 					logging.error(e)
 					rule = tornado.options.options.default
