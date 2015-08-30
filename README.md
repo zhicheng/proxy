@@ -18,7 +18,7 @@
 
 	$ cp rules.conf.default rules.conf
 
-## run 
+## Run 
 
 	$ ./proxy
 
