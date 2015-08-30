@@ -7,6 +7,10 @@ socks5s_crt  = 'server.crt'
 
 default = {'mode': 'socks5s', 'host': '127.0.0.1', 'port': 7443}
 
+auth = {
+        #'username': 'password'	# should not add this for client use Chrome,Safari,Firefox all handle this wrong
+}
+
 country_rules = {
 	'cn': {'mode': 'pass'},
 }

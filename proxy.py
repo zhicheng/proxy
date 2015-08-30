@@ -127,10 +127,39 @@ class ProxyConnection(object):
 			else:
 				stream = yield tornado.tcpclient.TCPClient().connect(host, port)
 
-			stream.write(struct.pack('BBB', SOCKS5.VER, 1, SOCKS5.METHOD_NOAUTH))
+			if rule.get('username', None):
+				stream.write(
+					struct.pack('BBBB',
+						SOCKS5.VER,
+						2,
+						SOCKS5.METHOD_NOAUTH,
+						SOCKS5.METHOD_USERNAME
+					))
+			else:
+				stream.write(
+					struct.pack('BBB',
+						SOCKS5.VER,
+						1,
+						SOCKS5.METHOD_NOAUTH,
+					))
+
 			data = yield stream.read_bytes(2)
+			ver, method = struct.unpack('BB', data)
+
+			if method == SOCKS5.METHOD_USERNAME:
+				data  = struct.pack('BB', 1, len(rule.get('username', '')))
+				data += rule.get('username', '')
+				data += struct.pack('B', len(rule.get('password', '')))
+				data += rule.get('password', '')
+				stream.write(data)
+				data = yield stream.read_bytes(2)
+				ver, status = struct.unpack('BB', data)
+				if status != 0:
+					stream.close()
+					raise tornado.gen.Return(None)
+						
 			if data != struct.pack('BB', SOCKS5.VER, SOCKS5.METHOD_NOAUTH):
-				raise Exception()
+				raise tornado.gen.Return(None)
 
 			request = struct.pack('!BBBB',
 					SOCKS5.VER,
@@ -145,7 +174,7 @@ class ProxyConnection(object):
 					   dstaddr + struct.pack('!H', dstport)
 			stream.write(request)
 		else:
-			raise Exception()
+			raise tornado.gen.Return(None)
 
 		raise tornado.gen.Return(stream)
 
@@ -166,10 +195,33 @@ class ProxyConnection(object):
 			return
 
 		methods = yield client.read_bytes(nmethods)
-		client.write(struct.pack('BB', SOCKS5.VER, SOCKS5.METHOD_NOAUTH))
+		if tornado.options.options.auth:
+			if struct.pack('B', SOCKS5.METHOD_USERNAME) not in methods:
+				client.write(struct.pack('BB', SOCKS5.VER, SOCKS5.METHOD_NOACCEPT))
+				client.close()
+				return
+
+			client.write(struct.pack('BB', SOCKS5.VER, SOCKS5.METHOD_USERNAME))
+			ver  = yield client.read_bytes(1)
+
+			data   = yield client.read_bytes(1)
+			ulen   = struct.unpack('B', data)[0]
+			uname  = yield client.read_bytes(ulen)
+
+			data   = yield client.read_bytes(1)
+			plen   = struct.unpack('B', data)[0]
+			passwd = yield client.read_bytes(plen)
+
+			if tornado.options.options.auth.get(uname, None) == passwd:
+				client.write(struct.pack('BB', 1, 0))
+			else:
+				client.write(struct.pack('BB', 1, 1))
+				client.close()
+				return
+		else:
+			client.write(struct.pack('BB', SOCKS5.VER, SOCKS5.METHOD_NOAUTH))
 
 		data = yield client.read_bytes(4)
-		request = data
 
 		ver, cmd, rsv, atyp = struct.unpack('BBBB', data)
 		if atyp == SOCKS5.ATYP_IPV4:
@@ -206,7 +258,9 @@ class ProxyConnection(object):
 			return
 
 		remote = yield self.upstream(client, atyp, dstaddr, dstport)
-
+		if remote is None:
+			client.close()
+			return
 
 		self.client = client
 		self.remote = remote
@@ -224,11 +278,10 @@ class ProxyServer(tornado.tcpserver.TCPServer):
 
 def main():
 	tornado.options.define("workers", default=1)
+	tornado.options.define("auth",    default={})
 	tornado.options.define("default", default={'mode': 'pass'})
 
-	tornado.options.define("socks5_port",    default=8888)
-
-	tornado.options.define("socks5s",      default=False)
+	tornado.options.define("socks5_port",  default=8888)
 	tornado.options.define("socks5s_port", default=8443)
 	tornado.options.define("socks5s_key",  default="server.key")
 	tornado.options.define("socks5s_crt",  default="server.crt")
