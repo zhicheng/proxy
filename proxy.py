@@ -2,6 +2,7 @@ import ssl
 import struct
 import socket
 import logging
+import fnmatch
 import functools
 import tornado.gen
 import tornado.ioloop
@@ -14,6 +15,34 @@ import tornado.autoreload
 
 import geoip2.database
 geoip = geoip2.database.Reader('GeoLite2-Country.mmdb')
+
+class SOCKS5(object):
+	VER = 5
+	RSV = 0
+
+	REP_SUCCESSED   = 0
+	REP_SERVERFAIL  = 1
+	REP_NOTALLOWED  = 2
+	REP_NETWORKFAIL = 3
+	REP_HOSTFAIL    = 4
+	REP_CONNFAIL    = 5
+	REP_TTLEXPIRED  = 6
+	REP_NOTSUPPORTED = 7
+	REP_ADDRESSERROR = 8
+
+	METHOD_NOAUTH   = 0
+	METHOD_GSSAPI   = 1
+	METHOD_USERNAME = 2
+	METHOD_NOACCEPT = 0xFF
+
+	ATYP_IPV4       = 1
+	ATYP_DOMAINNAME = 3
+	ATYP_IPV6       = 4
+
+	CMD_CONNECT = 1
+	CMD_BIND    = 2
+	CMD_UDP     = 3
+
 
 class ProxyConnection(object):
 
@@ -48,57 +77,70 @@ class ProxyConnection(object):
 			self.client.close()
 
 	@tornado.gen.coroutine
-	def upstream(self, addr, port, client, request, hostname=None):
-		try:
-			country = geoip.country(addr).country.iso_code.lower()
-		except Exception as e:
-			country = 'us'
+	def upstream(self, client, atyp, dstaddr, dstport):
+		if atyp == SOCKS5.ATYP_IPV4:
+			rule = tornado.options.options.default
+			rule = tornado.options.options.country_rules.get(cc, rule)
+			rule = tornado.options.options.hostname_rules.get(dstaddr, rule)
+			ip   = dstaddr
+		elif atyp == SOCKS5.ATYP_DOMAINNAME:
+			rule = {}
+			for pat, val in tornado.options.options.hostname_rules.iteritems():
+				if fnmatch.fnmatch(dstaddr, pat):
+					rule = val 
+					break
 
-		rule = tornado.options.options.default
+			if rule.get('mode', 'pass') == 'pass':
+				rule = tornado.options.options.default
+				try:
+					addr = yield self.resolver.resolve(dstaddr, dstport)
+					ip = addr[0][1][0]
+					cc = geoip.country(ip).country.iso_code
+					if cc:
+						cc = cc.lower()
+					rule = tornado.options.options.country_rules.get(cc, rule)
+				except Exception as e:
+					logging.error(e)
+					rule = tornado.options.options.default
 
-		if country in tornado.options.options.country_rules:
-			rule = tornado.options.options.country_rules.get(country)
-		if hostname in tornado.options.options.hostname_rules:
-			rule = tornado.options.options.hostname_rules.get(hostname)
+		mode = rule.get('mode', 'pass').lower()
+		host = rule.get('host', None)
+		port = rule.get('port', None)
 
-		if rule.get('mode', 'pass') == 'pass':
-			logging.info('pass  %s to %s %s' % (self.address, hostname, (addr, port)))
+		if mode == 'pass':
+			logging.info('pass  %s to %s' % (self.address, (dstaddr, dstport)))
 
-			stream = yield tornado.tcpclient.TCPClient().connect(addr, port)
-
-			data  = struct.pack('!BBBB', 0x05, 0x00, 0x00, 0x01)
-			data += socket.inet_aton(addr) + struct.pack('!H', port)
+			stream = yield tornado.tcpclient.TCPClient().connect(dstaddr, dstport)
+			data  = struct.pack('!BBBB',
+					SOCKS5.VER, SOCKS5.REP_SUCCESSED, SOCKS5.RSV, SOCKS5.ATYP_IPV4)
+			data += socket.inet_aton(ip) + struct.pack('!H', dstport)
 			client.write(data)
-		elif rule.get('mode', 'pass').lower() == 'socks5':
-			logging.info('proxy %s to %s %s via %s' % \
-				(self.address, hostname, (addr, port), (rule.get('host'), rule.get('port'))))
+		elif mode == 'socks5' or mode == 'socks5s':
+			logging.info('proxy %s to %s via %s' % (self.address, (dstaddr, dstport), (host, port)))
 
-			stream = yield tornado.tcpclient.TCPClient().connect(rule.get('host'), rule.get('port'))
-			stream.write(struct.pack('BBB', 0x05, 0x01, 0x00))
+			if mode == 'socks5s':
+				stream = yield tornado.tcpclient.TCPClient().connect(host, port,
+						ssl_options=dict(cert_reqs=ssl.CERT_NONE))
+			else:
+				stream = yield tornado.tcpclient.TCPClient().connect(host, port)
+
+			stream.write(struct.pack('BBB', SOCKS5.VER, 1, SOCKS5.METHOD_NOAUTH))
 			data = yield stream.read_bytes(2)
-			if data != struct.pack('BB', 0x05, 0x00):
+			if data != struct.pack('BB', SOCKS5.VER, SOCKS5.METHOD_NOAUTH):
 				raise Exception()
 
+			request = struct.pack('!BBBB',
+					SOCKS5.VER,
+					SOCKS5.CMD_CONNECT,
+					SOCKS5.RSV,
+					atyp,
+				)
+			if atyp == SOCKS5.ATYP_IPV4:
+				request += socket.inet_aton(dstaddr) + struct.pack('!H', dstport)
+			elif atyp == SOCKS5.ATYP_DOMAINNAME:
+				request += struct.pack('B', len(dstaddr)) + \
+					   dstaddr + struct.pack('!H', dstport)
 			stream.write(request)
-			data = yield stream.read_bytes(4096, partial=True)
-			client.write(data)
-		elif rule.get('mode', 'pass').lower() == 'socks5s':
-			logging.info('proxy %s to %s %s via %s' % \
-				(self.address, hostname, (addr, port), (rule.get('host'), rule.get('port'))))
-
-			stream = yield tornado.tcpclient.TCPClient().connect(
-					rule.get('host'),
-					rule.get('port'),
-					ssl_options=dict(cert_reqs=ssl.CERT_NONE))
-			yield stream.wait_for_handshake()
-			stream.write(struct.pack('BBB', 0x05, 0x01, 0x00))
-			data = yield stream.read_bytes(2)
-			if data != struct.pack('BB', 0x05, 0x00):
-				raise Exception()
-
-			stream.write(request)
-			data = yield stream.read_bytes(4096, partial=True)
-			client.write(data)
 		else:
 			raise Exception()
 
@@ -119,53 +161,48 @@ class ProxyConnection(object):
 			)
 			client.close()
 			return
+
 		methods = yield client.read_bytes(nmethods)
-		client.write(struct.pack('BB', 0x05, 0x00))
+		client.write(struct.pack('BB', SOCKS5.VER, SOCKS5.METHOD_NOAUTH))
 
 		data = yield client.read_bytes(4)
 		request = data
 
 		ver, cmd, rsv, atyp = struct.unpack('BBBB', data)
-		if atyp == 0x01:
+		if atyp == SOCKS5.ATYP_IPV4:
 			data = yield client.read_bytes(4)
-			host = socket.inet_ntoa(data)
-			request += data
-			addr = host
+			dstaddr = socket.inet_ntoa(data)
 
 			data = yield client.read_bytes(2)
-			request += data
-			port = struct.unpack('!H', data)[0]
-		elif atyp == 0x03:
+			dstport = struct.unpack('!H', data)[0]
+		elif atyp == SOCKS5.ATYP_DOMAINNAME:
 			data = yield client.read_bytes(1)
-			request += data
-			data = yield client.read_bytes(struct.unpack('B', data)[0])
-			request += data
-			host = data
+			dstaddr = yield client.read_bytes(struct.unpack('B', data)[0])
 
 			data = yield client.read_bytes(2)
-			request += data
-			port = struct.unpack('!H', data)[0]
-
-			rule = tornado.options.options.hostname_rules.get(host, {})
-			if rule.get('mode', 'pass') == 'pass':
-				try:
-					addr = yield self.resolver.resolve(host, port)
-					addr = addr[0][1][0]
-				except Exception as e:
-					logging.error(e)
-					addr = ''
-			else:
-				addr = ''
-		elif atyp == 0x04:
-			client.write(struct.pack('!BBBBIH', 0x05, 0x07, 0x00, 0x01, 0, 0))
+			dstport = struct.unpack('!H', data)[0]
+		elif atyp == SOCKS5.ATYP_IPV6:
+			client.write(
+				struct.pack('!BBBBIH',
+					SOCKS5.VER,
+					SOCKS5.REP_ADDRESSERROR,
+					SOCKS5.RSV,
+					SOCKS5.ATYP_IPV4, 0, 0
+				))
 			client.close()
 			return
 		else:
-			client.write(struct.pack('!BBBBIH', 0x05, 0x07, 0x00, 0x01, 0, 0))
+			client.write(
+				struct.pack('!BBBBIH',
+					SOCKS5.VER,
+					SOCKS5.REP_ADDRESSERROR,
+					SOCKS5.RSV,
+					SOCKS5.ATYP_IPV4, 0, 0
+				))
 			client.close()
 			return
 
-		remote = yield self.upstream(addr, port, client, request, host)
+		remote = yield self.upstream(client, atyp, dstaddr, dstport)
 
 
 		self.client = client
