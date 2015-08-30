@@ -45,6 +45,7 @@ default rule set `mode` value
 2. `socks5` use `socks5` proxy upstream
 3. `socks5s` same as above but ssl
 
+
 	default = {'mode': 'socks5s', 'host': '127.0.0.1', 'port': 7443}
 
 
