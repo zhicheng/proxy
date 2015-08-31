@@ -46,7 +46,9 @@ default rule set `mode` value
 3. `socks5s` same as above but ssl
 
 
-	default = {'mode': 'socks5s', 'host': '127.0.0.1', 'port': 7443}
+```
+default = {'mode': 'socks5s', 'host': '127.0.0.1', 'port': 7443}
+```
 
 
 Authenticate for client,may not work with your client.
@@ -71,3 +73,9 @@ hostname rule set high priority, support wildcard match like `*.example.com`
 # Best Practice
 
 TODO
+
+# Bugs
+
+* DNS Query will block and can be poisoning,current use hostname_rules avoiding make local domain query.
+* Slow performance.
+
