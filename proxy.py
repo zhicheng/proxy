@@ -78,33 +78,32 @@ class ProxyConnection(object):
 
 	@tornado.gen.coroutine
 	def upstream(self, client, atyp, dstaddr, dstport):
-		if atyp == SOCKS5.ATYP_IPV4:
-			rule = tornado.options.options.default
-			rule = tornado.options.options.country_rules.get(dstaddr, rule)
-			rule = tornado.options.options.hostname_rules.get(dstaddr, rule)
-			ip   = dstaddr
-		elif atyp == SOCKS5.ATYP_DOMAINNAME:
-			rule = {}
-			matched = False
-			for pat, val in tornado.options.options.hostname_rules.iteritems():
-				if fnmatch.fnmatch(dstaddr, pat):
-					rule = val 
-					matched = True
-					break
+		rule = {}
+		matched = False
+		for pat, val in tornado.options.options.hostname_rules.iteritems():
+			if fnmatch.fnmatch(dstaddr, pat):
+				rule = val 
+				matched = True
+				break
 
-			if rule.get('mode', 'pass'):
+		if not matched:
+			ip = None
+			if atyp == SOCKS5.ATYP_IPV4:
+				ip = dstaddr
+			elif atyp == SOCKS5.ATYP_DOMAINNAME:
 				try:
 					addr = yield self.resolver.resolve(dstaddr, dstport)
 					ip = addr[0][1][0]
-					if not matched:
-						rule = tornado.options.options.default
-						cc = geoip.country(ip).country.iso_code
-						if cc:
-							cc = cc.lower()
-						rule = tornado.options.options.country_rules.get(cc, rule)
 				except Exception as e:
+					ip = None
 					logging.error(e)
 					rule = tornado.options.options.default
+			if ip:
+				rule = tornado.options.options.default
+				cc = geoip.country(ip).country.iso_code
+				if cc:
+					cc = cc.lower()
+				rule = tornado.options.options.country_rules.get(cc, rule)
 
 		mode = rule.get('mode', 'pass').lower()
 		host = rule.get('host', None)
