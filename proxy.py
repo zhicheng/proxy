@@ -80,7 +80,7 @@ class ProxyConnection(object):
 	def upstream(self, client, atyp, dstaddr, dstport):
 		if atyp == SOCKS5.ATYP_IPV4:
 			rule = tornado.options.options.default
-			rule = tornado.options.options.country_rules.get(cc, rule)
+			rule = tornado.options.options.country_rules.get(dstaddr, rule)
 			rule = tornado.options.options.hostname_rules.get(dstaddr, rule)
 			ip   = dstaddr
 		elif atyp == SOCKS5.ATYP_DOMAINNAME:
