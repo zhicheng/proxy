@@ -52,24 +52,26 @@ class ProxyConnection(object):
 
 		self.handshake(client)
 
+	@tornado.gen.coroutine
 	def client_recv(self, data, finished=False):
-
 		if len(data):
 			try:
-				self.remote.write(data)
+				yield self.remote.write(data)
 			except Exception as e:
+				logging.error(e)
 				finished = True
 
 		if finished:
 			self.remote.close()
 			self.client.close()
 
+	@tornado.gen.coroutine
 	def remote_recv(self, data, finished=False):
-
 		if len(data):
 			try:
-				self.client.write(data)
+				yield self.client.write(data)
 			except Exception as e:
+				logging.error(e)
 				finished = True
 
 		if finished:
@@ -78,6 +80,7 @@ class ProxyConnection(object):
 
 	@tornado.gen.coroutine
 	def upstream(self, client, atyp, dstaddr, dstport):
+		ip   = '0.0.0.0'
 		rule = {}
 		matched = False
 		for pat, val in tornado.options.options.hostname_rules.iteritems():
@@ -87,7 +90,6 @@ class ProxyConnection(object):
 				break
 
 		if not matched:
-			ip = None
 			if atyp == SOCKS5.ATYP_IPV4:
 				ip = dstaddr
 			elif atyp == SOCKS5.ATYP_DOMAINNAME:
@@ -98,7 +100,7 @@ class ProxyConnection(object):
 					ip = None
 					logging.error(e)
 					rule = tornado.options.options.default
-			if ip:
+			if ip != '0.0.0.0' and ip != None:
 				rule = tornado.options.options.default
 				cc = geoip.country(ip).country.iso_code
 				if cc:
@@ -256,7 +258,11 @@ class ProxyConnection(object):
 			client.close()
 			return
 
-		remote = yield self.upstream(client, atyp, dstaddr, dstport)
+		try:
+			remote = yield self.upstream(client, atyp, dstaddr, dstport)
+		except Exception as e:
+			remote = None
+
 		if remote is None:
 			client.close()
 			return
