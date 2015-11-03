@@ -61,8 +61,9 @@ class ProxyConnection(object):
 				finished = False
 				yield self.remote.write(data)
 			except tornado.iostream.StreamClosedError as e:
-				pass
+				finished = True
 			except Exception as e:
+				finished = True
 				logging.error(e)
 
 		if finished:
@@ -78,8 +79,9 @@ class ProxyConnection(object):
 				finished = False
 				yield self.client.write(data)
 			except tornado.iostream.StreamClosedError as e:
-				pass
+				finished = True
 			except Exception as e:
+				finished = True
 				logging.error(e)
 
 		if finished:
