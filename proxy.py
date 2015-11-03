@@ -53,26 +53,34 @@ class ProxyConnection(object):
 		self.handshake(client)
 
 	@tornado.gen.coroutine
-	def client_recv(self, data, finished=False):
+	def client_recv(self, data):
+
+		finished = True
 		if len(data):
 			try:
+				finished = False
 				yield self.remote.write(data)
+			except tornado.iostream.StreamClosedError as e:
+				pass
 			except Exception as e:
 				logging.error(e)
-				finished = True
 
 		if finished:
 			self.remote.close()
 			self.client.close()
 
 	@tornado.gen.coroutine
-	def remote_recv(self, data, finished=False):
+	def remote_recv(self, data):
+
+		finished = True
 		if len(data):
 			try:
+				finished = False
 				yield self.client.write(data)
+			except tornado.iostream.StreamClosedError as e:
+				pass
 			except Exception as e:
 				logging.error(e)
-				finished = True
 
 		if finished:
 			self.remote.close()
@@ -270,11 +278,8 @@ class ProxyConnection(object):
 		self.client = client
 		self.remote = remote
 
-		client_finish = functools.partial(self.client_recv, finished=True)
-		client.read_until_close(client_finish, self.client_recv)
-
-		remote_finish = functools.partial(self.remote_recv, finished=True)
-		remote.read_until_close(remote_finish, self.remote_recv)
+		client.read_until_close(streaming_callback=self.client_recv)
+		remote.read_until_close(streaming_callback=self.remote_recv)
 
 class ProxyServer(tornado.tcpserver.TCPServer):
 
@@ -300,8 +305,12 @@ def main():
         tornado.options.parse_config_file(tornado.options.options.config)
 
 	socks5_sockets = tornado.netutil.bind_sockets(tornado.options.options.socks5_port)
+	for s in socks5_sockets:
+		s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 	if tornado.options.options.socks5s_port:
 		socks5s_sockets = tornado.netutil.bind_sockets(tornado.options.options.socks5s_port)
+		for s in socks5s_sockets:
+			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 	tornado.process.fork_processes(tornado.options.options.workers)
 
 	socks5_server = ProxyServer()
