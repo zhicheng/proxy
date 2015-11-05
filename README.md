@@ -44,6 +44,7 @@ default rule set `mode` value
 1. `pass` passthrough mode
 2. `socks5` use `socks5` proxy upstream
 3. `socks5s` same as above but ssl
+4. `reject` do not proxy anything
 
 
 ```

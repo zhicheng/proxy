@@ -129,6 +129,15 @@ class ProxyConnection(object):
 					SOCKS5.VER, SOCKS5.REP_SUCCESSED, SOCKS5.RSV, SOCKS5.ATYP_IPV4)
 			data += socket.inet_aton(ip) + struct.pack('!H', dstport)
 			client.write(data)
+		elif mode == 'reject':
+			logging.info('Reject %s to %s' % (self.address, (dstaddr, dstport)))
+			client.write(
+				'''HTTP/1.1 502 Bad Gateway\r\n'''
+				'''Content-Length: 73\r\n'''
+				'''Server: nginx/2.0\r\n'''
+				'''Content-Type: text/plain\r\n\r\n'''
+			)
+			client.close()
 		elif mode == 'socks5' or mode == 'socks5s':
 			logging.info('proxy %s to %s via %s' % (self.address, (dstaddr, dstport), (host, port)))
 
