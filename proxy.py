@@ -168,8 +168,9 @@ class ProxyConnection(object):
 				if status != 0:
 					stream.close()
 					raise tornado.gen.Return(None)
-						
-			if data != struct.pack('BB', SOCKS5.VER, SOCKS5.METHOD_NOAUTH):
+			elif method == SOCKS5.METHOD_NOAUTH:
+				pass
+			else:
 				raise tornado.gen.Return(None)
 
 			request = struct.pack('!BBBB',
@@ -194,7 +195,7 @@ class ProxyConnection(object):
 
 		data = yield client.read_bytes(2)
 		ver, nmethods = struct.unpack('BB', data)
-		if ver != 5:
+		if ver != SOCKS5.VER:
 			client.write(
 				'''HTTP/1.1 200 OK\r\n'''
 				'''Content-Length: 10\r\n'''
