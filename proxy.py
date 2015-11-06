@@ -94,7 +94,7 @@ class ProxyConnection(object):
 		rule = {}
 		matched = False
 		for pat, val in tornado.options.options.hostname_rules.iteritems():
-			if fnmatch.fnmatch(dstaddr, pat):
+			if fnmatch.fnmatch(dstaddr, pat) or (pat.startswith('*') and fnmatch.fnmatch(dstaddr, pat[2:])):
 				rule = val 
 				matched = True
 				break
