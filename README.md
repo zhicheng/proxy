@@ -69,6 +69,9 @@ hostname rule set high priority, support wildcard match like `*.example.com`
 	hostname_rules = {
 		'127.0.0.1': {'mode': 'pass'},
 		'localhost': {'mode': 'pass'},
+		'192.168.0.0/16': {'mode': 'pass'},
+		'10.0.0.0/8': {'mode': 'pass'},
+		'172.16.0.0/12': {'mode': 'pass'},
 	}
 
 # Best Practice
