@@ -102,7 +102,6 @@ class ProxyConnection(object):
 			elif atyp == SOCKS5.ATYP_IPV4 or atyp == SOCKS5.ATYP_IPV6:
 				try:
 					if ipaddress.ip_address(unicode(dstaddr)) in ipaddress.ip_network(unicode(pat)):
-						logging.info('bingo %s %s' % (dstaddr, atyp))
 						rule = val
 						matched = True
 						break
