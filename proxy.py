@@ -1,6 +1,7 @@
 import ssl
 import struct
 import socket
+import random
 import logging
 import fnmatch
 import functools
@@ -116,6 +117,8 @@ class ProxyConnection(object):
 				if cc:
 					cc = cc.lower()
 				rule = tornado.options.options.country_rules.get(cc, rule)
+		if isinstance(rule, (list, tuple)):
+			rule = rule[random.randint(0, len(rule))]
 
 		mode = rule.get('mode', 'pass').lower()
 		host = rule.get('host', None)
@@ -301,7 +304,7 @@ class ProxyServer(tornado.tcpserver.TCPServer):
 def main():
 	tornado.options.define("workers", default=1)
 	tornado.options.define("auth",    default={})
-	tornado.options.define("default", default={'mode': 'pass'})
+	tornado.options.define("default", default=[{'mode': 'pass'}])
 
 	tornado.options.define("socks5_port",  default=8888)
 	tornado.options.define("socks5s_port", default=8443)
