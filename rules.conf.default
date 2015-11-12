@@ -21,4 +21,5 @@ hostname_rules = {
 	'192.168.0.0/16': {'mode': 'pass'},
 	'10.0.0.0/8': {'mode': 'pass'},
 	'172.16.0.0/12': {'mode': 'pass'},
+	'*example.com': default,
 }
