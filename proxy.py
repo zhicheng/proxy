@@ -4,6 +4,7 @@ import socket
 import random
 import logging
 import fnmatch
+import ipaddress
 import functools
 import tornado.gen
 import tornado.ioloop
@@ -95,10 +96,18 @@ class ProxyConnection(object):
 		rule = {}
 		matched = False
 		for pat, val in tornado.options.options.hostname_rules.iteritems():
-			if fnmatch.fnmatch(dstaddr, pat):
-				rule = val 
+			if fnmatch.fnmatch(dstaddr, pat) or (pat.startswith('*') and fnmatch.fnmatch(dstaddr, pat[2:])):
+				rule = val
 				matched = True
 				break
+			elif atyp == SOCKS5.ATYP_IPV4 or atyp == SOCKS5.ATYP_IPV6:
+				try:
+					if ipaddress.ip_address(unicode(dstaddr)) in ipaddress.ip_network(unicode(pat)):
+						rule = val
+						matched = True
+						break
+				except Exception:
+					pass
 
 		if not matched:
 			if atyp == SOCKS5.ATYP_IPV4:
