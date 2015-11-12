@@ -126,8 +126,8 @@ class ProxyConnection(object):
 				if cc:
 					cc = cc.lower()
 				rule = tornado.options.options.country_rules.get(cc, rule)
-		if isinstance(rule, (list, tuple)):
-			rule = rule[random.randint(0, len(rule))]
+		if isinstance(rule, (list, tuple)) and rule:
+			rule = rule[random.randint(0, len(rule))-1]
 
 		mode = rule.get('mode', 'pass').lower()
 		host = rule.get('host', None)
