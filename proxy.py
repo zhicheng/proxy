@@ -49,46 +49,36 @@ class SOCKS5(object):
 class ProxyConnection(object):
 
 	def __init__(self, client, address, server):
-		self.address = address
+		self.server   = server
+		self.address  = address
 		self.resolver = server.resolver
 
 		self.handshake(client)
 
+	def close_callback(self):
+		if not self.client.closed():
+			self.client.close()
+		if not self.remote.closed():
+			self.remote.close()
+
+		if self.address in self.server.connection:
+			del self.server.connection[self.address]
+
 	@tornado.gen.coroutine
 	def client_recv(self, data):
-
-		finished = True
 		if len(data):
 			try:
-				finished = False
 				yield self.remote.write(data)
-			except tornado.iostream.StreamClosedError as e:
-				finished = True
 			except Exception as e:
-				finished = True
 				logging.error(e)
-
-		if finished:
-			self.remote.close()
-			self.client.close()
 
 	@tornado.gen.coroutine
 	def remote_recv(self, data):
-
-		finished = True
 		if len(data):
 			try:
-				finished = False
 				yield self.client.write(data)
-			except tornado.iostream.StreamClosedError as e:
-				finished = True
 			except Exception as e:
-				finished = True
 				logging.error(e)
-
-		if finished:
-			self.remote.close()
-			self.client.close()
 
 	@tornado.gen.coroutine
 	def upstream(self, client, atyp, dstaddr, dstport):
@@ -304,6 +294,9 @@ class ProxyConnection(object):
 
 		client.read_until_close(streaming_callback=self.client_recv)
 		remote.read_until_close(streaming_callback=self.remote_recv)
+
+		client.set_close_callback(self.close_callback)
+		remote.set_close_callback(self.close_callback)
 
 class ProxyServer(tornado.tcpserver.TCPServer):
 
