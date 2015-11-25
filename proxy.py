@@ -292,6 +292,9 @@ class ProxyConnection(object):
 		self.client = client
 		self.remote = remote
 
+		client.set_nodelay(True)
+		remote.set_nodelay(True)
+
 		client.read_until_close(streaming_callback=self.client_recv)
 		remote.read_until_close(streaming_callback=self.remote_recv)
 
