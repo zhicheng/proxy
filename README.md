@@ -49,7 +49,7 @@ default rule set `mode` value
 
 ```
 default = [{'mode': 'socks5s', 'host': '127.0.0.1', 'port': 7443}]
-pass = [{'mode': 'pass'}]
+pass = {'mode': 'pass'}
 ```
 
 

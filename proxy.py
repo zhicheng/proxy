@@ -134,10 +134,11 @@ class ProxyConnection(object):
 		elif mode == 'reject':
 			logging.info('Reject %s to %s' % (self.address, (dstaddr, dstport)))
 			client.write(
-				'''HTTP/1.1 502 Bad Gateway\r\n'''
-				'''Content-Length: 73\r\n'''
+				'''HTTP/1.1 503 Service Unavailable\r\n'''
+				'''Content-Length: 28\r\n'''
 				'''Server: nginx/2.0\r\n'''
 				'''Content-Type: text/plain\r\n\r\n'''
+				'''Proxy Error (Reject by rule)'''
 			)
 			client.close()
 		elif mode == 'socks5' or mode == 'socks5s':
