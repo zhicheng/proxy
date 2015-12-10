@@ -85,7 +85,7 @@ class ProxyConnection(object):
 		ip   = '0.0.0.0'
 		rule = {}
 		matched = False
-		for pat, val in tornado.options.options.hostname_rules.iteritems():
+		for pat, val in tornado.options.options.hostname_rules:
 			if fnmatch.fnmatch(dstaddr, pat):
 				rule = val
 				matched = True
@@ -317,7 +317,7 @@ def main():
 	tornado.options.define("socks5s_crt",  default="server.crt")
 
 	tornado.options.define("country_rules",  default={})
-	tornado.options.define("hostname_rules", default={})
+	tornado.options.define("hostname_rules", default=[])
 
 	tornado.options.define("config", default='rules.conf')
 

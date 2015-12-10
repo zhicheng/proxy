@@ -6,20 +6,21 @@ socks5s_key  = 'server.key'
 socks5s_crt  = 'server.crt'
 
 default = [{'mode': 'socks5s', 'host': '127.0.0.1', 'port': 7443}]
+pass = [{'mode': 'pass'}]
 
 auth = {
-        #'username': 'password'	# should not add this for client use Chrome,Safari,Firefox all handle this wrong
+	#'username': 'password'	# should not add this for client use Chrome,Safari,Firefox all handle this wrong
 }
 
 country_rules = {
 	'cn': {'mode': 'pass'},
 }
 
-hostname_rules = {
-	'127.0.0.1': {'mode': 'pass'},
-	'localhost': {'mode': 'pass'},
-	'192.168.0.0/16': {'mode': 'pass'},
-	'10.0.0.0/8': {'mode': 'pass'},
-	'172.16.0.0/12': {'mode': 'pass'},
-	'*example.com': default,
-}
+hostname_rules = [
+	('127.0.0.1', pass),
+	('localhost', pass),
+	('192.168.0.0/16', pass),
+	('10.0.0.0/8', pass),
+	('172.16.0.0/12', pass),
+	('*example.com', default),
+]
