@@ -70,7 +70,7 @@ class ProxyConnection(object):
 			try:
 				yield self.remote.write(data)
 			except Exception as e:
-				logging.error(e)
+				logging.exception('remote_write')
 
 	@tornado.gen.coroutine
 	def remote_recv(self, data):
@@ -78,7 +78,7 @@ class ProxyConnection(object):
 			try:
 				yield self.client.write(data)
 			except Exception as e:
-				logging.error(e)
+				logging.exception('client_write')
 
 	@tornado.gen.coroutine
 	def upstream(self, client, atyp, dstaddr, dstport):
@@ -108,7 +108,7 @@ class ProxyConnection(object):
 					ip = addr[0][1][0]
 				except Exception as e:
 					ip = None
-					logging.error(e)
+					logging.exception('resolve')
 					rule = tornado.options.options.default
 			if ip != '0.0.0.0' and ip != None:
 				rule = tornado.options.options.default
