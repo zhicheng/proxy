@@ -55,13 +55,24 @@ class ProxyConnection(object):
 
 		self.handshake(client)
 
-	def close_callback(self):
+	def remote_close_callback(self):
 		if not self.client.closed():
 			self.client.close()
-			logging.info("Close client of %s", self.address)
+			logging.info("close %s -> %s by remote", self.address, self.remote_addr)
 		if not self.remote.closed():
 			self.remote.close()
-			logging.info("Close remote of %s", self.address)
+			logging.info("close %s -> %s by remote", self.address, self.remote_addr)
+
+		if self.address in self.server.connection:
+			del self.server.connection[self.address]
+
+	def client_close_callback(self):
+		if not self.client.closed():
+			self.client.close()
+			logging.info("close %s -> %s by client", self.address, self.remote_addr)
+		if not self.remote.closed():
+			self.remote.close()
+			logging.info("close %s -> %s by client", self.address, self.remote_addr)
 
 		if self.address in self.server.connection:
 			del self.server.connection[self.address]
@@ -301,8 +312,10 @@ class ProxyConnection(object):
 		client.read_until_close(streaming_callback=self.client_recv)
 		remote.read_until_close(streaming_callback=self.remote_recv)
 
-		client.set_close_callback(self.close_callback)
-		remote.set_close_callback(self.close_callback)
+		client.set_close_callback(self.client_close_callback)
+		remote.set_close_callback(self.remote_close_callback)
+
+		self.remote_addr = (dstaddr, dstport)
 
 class ProxyServer(tornado.tcpserver.TCPServer):
 
