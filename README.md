@@ -48,7 +48,8 @@ default rule set `mode` value
 
 
 ```
-default = {'mode': 'socks5s', 'host': '127.0.0.1', 'port': 7443}
+default = [{'mode': 'socks5s', 'host': '127.0.0.1', 'port': 7443}]
+pass = {'mode': 'pass'}
 ```
 
 
@@ -61,18 +62,19 @@ Authenticate for client,may not work with your client.
 country rule set
 
 	country_rules = {
-		'cn': {'mode': 'pass'},
+		'cn': pass,
 	}
 
 hostname rule set high priority, support wildcard match like `*.example.com` 
 
-	hostname_rules = {
-		'127.0.0.1': {'mode': 'pass'},
-		'localhost': {'mode': 'pass'},
-		'192.168.0.0/16': {'mode': 'pass'},
-		'10.0.0.0/8': {'mode': 'pass'},
-		'172.16.0.0/12': {'mode': 'pass'},
-	}
+	hostname_rules = [
+		('127.0.0.1', pass),
+		('localhost', pass),
+		('10.0.0.0/8', pass),
+		('172.16.0.0/12', pass),
+		('192.168.0.0/16', pass),
+		('*example.com', default),
+	]
 
 # Best Practice
 

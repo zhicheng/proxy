@@ -85,7 +85,7 @@ class ProxyConnection(object):
 		ip   = '0.0.0.0'
 		rule = {}
 		matched = False
-		for pat, val in tornado.options.options.hostname_rules.iteritems():
+		for pat, val in tornado.options.options.hostname_rules:
 			if fnmatch.fnmatch(dstaddr, pat):
 				rule = val
 				matched = True
@@ -134,10 +134,11 @@ class ProxyConnection(object):
 		elif mode == 'reject':
 			logging.info('Reject %s to %s' % (self.address, (dstaddr, dstport)))
 			client.write(
-				'''HTTP/1.1 502 Bad Gateway\r\n'''
-				'''Content-Length: 73\r\n'''
+				'''HTTP/1.1 503 Service Unavailable\r\n'''
+				'''Content-Length: 28\r\n'''
 				'''Server: nginx/2.0\r\n'''
 				'''Content-Type: text/plain\r\n\r\n'''
+				'''Proxy Error (Reject by rule)'''
 			)
 			client.close()
 		elif mode == 'socks5' or mode == 'socks5s':
@@ -317,7 +318,7 @@ def main():
 	tornado.options.define("socks5s_crt",  default="server.crt")
 
 	tornado.options.define("country_rules",  default={})
-	tornado.options.define("hostname_rules", default={})
+	tornado.options.define("hostname_rules", default=[])
 
 	tornado.options.define("config", default='rules.conf')
 
