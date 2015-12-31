@@ -58,8 +58,10 @@ class ProxyConnection(object):
 	def close_callback(self):
 		if not self.client.closed():
 			self.client.close()
+			logging.info("Close client of %s", self.address)
 		if not self.remote.closed():
 			self.remote.close()
+			logging.info("Close remote of %s", self.address)
 
 		if self.address in self.server.connection:
 			del self.server.connection[self.address]
