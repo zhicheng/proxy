@@ -71,7 +71,7 @@ class ProxyConnection(object):
 
 	@tornado.gen.coroutine
 	def client_recv(self, data):
-		if len(data):
+		if len(data) and not self.remote.closed():
 			try:
 				yield self.remote.write(data)
 			except Exception as e:
@@ -82,14 +82,14 @@ class ProxyConnection(object):
 
 	@tornado.gen.coroutine
 	def remote_recv(self, data):
-		if len(data):
+		if len(data) and not self.client.closed():
 			try:
 				yield self.client.write(data)
 			except Exception as e:
 				logging.exception('client_write')
 
 		if self.remote.closed():
-			self.remote.close()
+			self.client.close()
 
 	@tornado.gen.coroutine
 	def upstream(self, client, atyp, dstaddr, dstport):
