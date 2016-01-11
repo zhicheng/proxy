@@ -18,6 +18,8 @@ import tornado.autoreload
 import geoip2.database
 geoip = geoip2.database.Reader('GeoLite2-Country.mmdb')
 
+logging.basicConfig(format="%(asctime)-15s %(message)s")
+
 class SOCKS5(object):
 	VER = 5
 	RSV = 0
@@ -57,14 +59,16 @@ class ProxyConnection(object):
 
 	def remote_close_callback(self):
 		if self.client.closed():
-			logging.info("close %s -> %s by remote", self.address, self.remote_addr)
+			logging.info("close  %s:%d -> %s:%d by remote", 
+				self.address[0], self.address[1], self.remote_addr[0], self.remote_addr[1])
 
 			if self.address in self.server.connection:
 				del self.server.connection[self.address]
 
 	def client_close_callback(self):
 		if self.remote.closed():
-			logging.info("close %s -> %s by client", self.address, self.remote_addr)
+			logging.info("close  %s:%d -> %s:%d by client", 
+				self.address[0], self.address[1], self.remote_addr[0], self.remote_addr[1])
 
 			if self.address in self.server.connection:
 				del self.server.connection[self.address]
@@ -138,7 +142,8 @@ class ProxyConnection(object):
 		port = rule.get('port', None)
 
 		if mode == 'pass':
-			logging.info('pass  %s to %s' % (self.address, (dstaddr, dstport)))
+			logging.info('pass   %s:%d -> %s:%d',
+				self.address[0], self.address[1], dstaddr, dstport)
 
 			stream = yield tornado.tcpclient.TCPClient().connect(dstaddr, dstport)
 			data  = struct.pack('!BBBB',
@@ -146,7 +151,8 @@ class ProxyConnection(object):
 			data += socket.inet_aton(ip) + struct.pack('!H', dstport)
 			client.write(data)
 		elif mode == 'reject':
-			logging.info('Reject %s to %s' % (self.address, (dstaddr, dstport)))
+			logging.info('reject %s:%d -> %s:%d',
+					self.address[0], self.address[1], dstaddr, dstport)
 			client.write(
 				'''HTTP/1.1 503 Service Unavailable\r\n'''
 				'''Content-Length: 28\r\n'''
@@ -156,7 +162,8 @@ class ProxyConnection(object):
 			)
 			client.close()
 		elif mode == 'socks5' or mode == 'socks5s':
-			logging.info('proxy %s to %s via %s' % (self.address, (dstaddr, dstport), (host, port)))
+			logging.info('proxy  %s:%d -> %s:%d via %s:%d',
+				self.address[0], self.address[1], dstaddr, dstport, host, port)
 
 			if mode == 'socks5s':
 				stream = yield tornado.tcpclient.TCPClient().connect(host, port,
