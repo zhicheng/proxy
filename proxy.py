@@ -56,26 +56,18 @@ class ProxyConnection(object):
 		self.handshake(client)
 
 	def remote_close_callback(self):
-		if not self.client.closed():
-			self.client.close()
-			logging.info("close %s -> %s by remote", self.address, self.remote_addr)
-		if not self.remote.closed():
-			self.remote.close()
+		if self.client.closed():
 			logging.info("close %s -> %s by remote", self.address, self.remote_addr)
 
-		if self.address in self.server.connection:
-			del self.server.connection[self.address]
+			if self.address in self.server.connection:
+				del self.server.connection[self.address]
 
 	def client_close_callback(self):
-		if not self.client.closed():
-			self.client.close()
-			logging.info("close %s -> %s by client", self.address, self.remote_addr)
-		if not self.remote.closed():
-			self.remote.close()
+		if self.remote.closed():
 			logging.info("close %s -> %s by client", self.address, self.remote_addr)
 
-		if self.address in self.server.connection:
-			del self.server.connection[self.address]
+			if self.address in self.server.connection:
+				del self.server.connection[self.address]
 
 	@tornado.gen.coroutine
 	def client_recv(self, data):
@@ -85,6 +77,9 @@ class ProxyConnection(object):
 			except Exception as e:
 				logging.exception('remote_write')
 
+		if self.client.closed():
+			self.remote.close()
+
 	@tornado.gen.coroutine
 	def remote_recv(self, data):
 		if len(data):
@@ -92,6 +87,9 @@ class ProxyConnection(object):
 				yield self.client.write(data)
 			except Exception as e:
 				logging.exception('client_write')
+
+		if self.remote.closed():
+			self.remote.close()
 
 	@tornado.gen.coroutine
 	def upstream(self, client, atyp, dstaddr, dstport):
