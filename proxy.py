@@ -92,7 +92,6 @@ class ProxyConnection(object):
 				yield self.client.write(data)
 			except Exception as e:
 				logging.exception('client_write')
-
 			if self.remote.closed():
 				self.client.close()
 		else:
