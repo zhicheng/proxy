@@ -58,6 +58,9 @@ class ProxyConnection(object):
 		self.handshake(client)
 
 	def remote_close_callback(self):
+		if not self.client.writing():
+			self.client.close()
+
 		if self.client.closed():
 			logging.info("close  %s:%d -> %s:%d by remote", 
 				self.address[0], self.address[1], self.remote_addr[0], self.remote_addr[1])
@@ -66,6 +69,9 @@ class ProxyConnection(object):
 				del self.server.connection[self.address]
 
 	def client_close_callback(self):
+		if not self.remote.writing():
+			self.remote.close()
+
 		if self.remote.closed():
 			logging.info("close  %s:%d -> %s:%d by client", 
 				self.address[0], self.address[1], self.remote_addr[0], self.remote_addr[1])
